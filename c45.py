@@ -3,12 +3,8 @@ import pandas as pd
 import numpy as np
 import operator
 
-eps = np.finfo(float).eps
-
 play_tennis = pd.read_csv("play-tennis.csv")
 print(play_tennis)
-print()
-
 
 def globalEntropy(df):
 	entropy = 0
@@ -47,31 +43,28 @@ def attrEntropy(df,attrName):
 def informationGain(rootEntropy, attrEntropy):
 	return rootEntropy - attrEntropy
 
-def bestAttr(df, cols):
+def bestAttr(df):
 	gains = {}
-	for col in cols:
+	for col in df.columns[1:-1]:
 		gains[col] = informationGain(globalEntropy(df), attrEntropy(df, col))
+	#print(gains)
 	return max(gains, key=gains.get)
 
 def filterTab(df, attr, val):
 	return (df.loc[df[attr]==val])
 
-def check_all_attr(datas, wished_value):
-	for data in datas:
-		if data != wished_value:
-			return False
-	return True
+def check_all_attr(data):
+	if len(data.unique())==1:
+		return data.unique()
+	return None
 
-def id3(df, targetAttr, attrs, tree = None):
+def id3old(df, targetAttr, attrs, tree=None):
 
 	if tree is None:
 		tree = {}
 	
-	if check_all_attr(df[targetAttr], 'Yes'):
-		tree = {'Yes'}
-		return tree
-	if check_all_attr(df[targetAttr], 'No'):
-		tree = {'No'}
+	if not(check_all_attr(df[targetAttr]) is None):
+		tree = {check_all_attr(df[targetAttr])}
 		return tree
 
 	attr = bestAttr(df, attrs)
@@ -82,12 +75,32 @@ def id3(df, targetAttr, attrs, tree = None):
 	for attrVal in df[attr].unique():
 
 		tree[attr][attrVal] = {}
-		new_df = df.loc[df[attr] == attrVal]
-		tree[attr][attrVal] = id3(new_df, targetAttr, attrs, tree[attr])
+		new_df = filterTab(df, attr, attrVal)
+		tree[attr][attrVal] = id3old(new_df, targetAttr, attrs, tree[attr])
 		
 	return tree	
 
+def id3 (df, tree=None):
+	if tree is None:
+		tree = {}
+	if globalEntropy(df)==0:
+		tree = {df.iloc[:,-1][0]}
+		return tree
+	else:
+		root = bestAttr(df)
+		tree[root] = {}
+		for attrVal in df[root].unique():
+			new_df = filterTab(df, root, attrVal)
+			vals = new_df.iloc[:,-1].unique()
+			if len(vals)==1:
+				tree[root][attrVal] = vals[0]
+			else:
+				tree[root][attrVal] = id3(new_df)
+		return tree
+
 def gainratio(df, cols, gain):
+	if gain == 0 :
+		return 0
 	gainRatio = 0
 	splitInformation = 0
 	vals = df[cols].unique()
@@ -96,24 +109,22 @@ def gainratio(df, cols, gain):
 		p = df[cols].value_counts()[val]/len_vals
 		splitInformation = splitInformation + -p*safe_log2(p)
 
-	gainRatio = splitInformation / gain
+	gainRatio = gain / splitInformation
 	return gainRatio
 
-def bestAttrc45(df, cols, is_gain_ratio):
+def bestAttrc45(df, is_gain_ratio):
 	gains = {}
 	nonobject = {}
 	gainratios = {}
 
-	for col in cols:
+	for col in df.columns[1:-1]:
 		if df[col].dtype != 'object' :
-			nonobject[col], gains[col] = c45ContinousHandling(df, col)
+				nonobject[col], gains[col] = c45ContinousHandling(df, col)
 		else :
 			gains[col] = informationGain(globalEntropy(df), attrEntropy(df, col))
+		#print(gains[col])
 		gainratios[col] = gainratio(df, col, gains[col])
-		print("ini gainratio", gainratios[col])
-	
-	print(gainratios)
-	print(is_gain_ratio)
+
 	if is_gain_ratio :
 		maxc45 = max(gainratios, key=gainratios.get)
 	else :
@@ -121,7 +132,7 @@ def bestAttrc45(df, cols, is_gain_ratio):
 	
 	if maxc45 in nonobject :
 		df.loc[:,maxc45] = nonobject[maxc45]
-
+		
 	return maxc45
 
 def c45ContinousHandling(df, column_name):
@@ -150,29 +161,18 @@ def c45ContinousHandling(df, column_name):
     
     return temp, winner_gain
 
-def c45(df, targetAttr, attrs, is_gain_ratio, tree = None):
-
+def c45 (df,is_gain_ratio ,tree=None):
 	if tree is None:
 		tree = {}
-	
-	if check_all_attr(df[targetAttr], 'Yes'):
-		tree = {'Yes'}
-		return tree
-	if check_all_attr(df[targetAttr], 'No'):
-		tree = {'No'}
-		return tree
-
-	attr = bestAttrc45(df, attrs, is_gain_ratio)
-	attrs.remove(attr)
-	tree[attr] = {}
-	
-
-	for attrVal in df[attr].unique():
-
-		tree[attr][attrVal] = {}
-		new_df = df.loc[df[attr] == attrVal]
-		tree[attr][attrVal] = c45(new_df, targetAttr, attrs, tree[attr])
-		
+	root = bestAttrc45(df, is_gain_ratio)
+	tree[root] = {}
+	for attrVal in df[root].unique():
+		new_df = filterTab(df, root, attrVal)
+		vals = new_df.iloc[:,-1].unique()
+		if len(vals)==1:
+			tree[root][attrVal] = vals[0]
+		else:
+			tree[root][attrVal] = c45(new_df, is_gain_ratio)
 	return tree
 
 #print(informationGain(globalEntropy(play_tennis), attrEntropy(play_tennis, 'outlook')))
@@ -181,5 +181,10 @@ def c45(df, targetAttr, attrs, is_gain_ratio, tree = None):
 #print(filterTab(play_tennis, 'outlook', 'Sunny'))
 #print(check_all_attr(play_tennis.loc[play_tennis['outlook'] == 'Overcast'].iloc[:,-1], 'no'))
 
-#print(id3(play_tennis, 'play', list(['outlook', 'temp', 'humidity', 'wind'])))
-print(c45(play_tennis, 'play', list(['outlook', 'temp', 'humidity', 'wind']), False))
+print()
+print("play tennis dengan id3")
+print(id3(play_tennis))
+
+print()
+print("play tennis dengan c4.5, memakai gain ratio")
+print(c45(play_tennis, True))
