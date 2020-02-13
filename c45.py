@@ -118,6 +118,9 @@ def bestAttrc45(df, is_gain_ratio):
 	gainratios = {}
 
 	for col in df.columns[1:-1]:
+		if (len(df.loc[df[col] == '?']) > 0):
+			df = missingValueHandling(df, col)
+
 		if df[col].dtype != 'object' :
 				nonobject[col], gains[col] = c45ContinousHandling(df, col)
 		else :
@@ -134,6 +137,24 @@ def bestAttrc45(df, is_gain_ratio):
 		df.loc[:,maxc45] = nonobject[maxc45]
 		
 	return maxc45
+
+def missingValueHandling(df, col_name):
+	idx = df.loc[df[col_name] == "?"].index[0]
+
+	target = df.iloc[idx,-1]
+	val_attr = df[col_name].unique()
+	new_df = df.loc[df.iloc[:,-1] == target]
+
+	modus = 0
+	for val in val_attr:
+		p = new_df[col_name].value_counts()[val]
+		if modus < p:
+			modus = p
+			value = val
+		
+	df.loc[idx,col_name] = value
+
+	return df
 
 def c45ContinousHandling(df, column_name):
     values = sorted(df[column_name].unique())
