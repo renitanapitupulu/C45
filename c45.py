@@ -87,19 +87,42 @@ def id3(df, targetAttr, attrs, tree = None):
 		
 	return tree	
 
-def bestAttrc45(df, cols):
+def gainratio(df, cols, gain):
+	gainRatio = 0
+	splitInformation = 0
+	vals = df[cols].unique()
+	len_vals = len(df[cols])
+	for val in vals:
+		p = df[cols].value_counts()[val]/len_vals
+		splitInformation = splitInformation + -p*safe_log2(p)
+
+	gainRatio = splitInformation / gain
+	return gainRatio
+
+def bestAttrc45(df, cols, is_gain_ratio):
 	gains = {}
 	nonobject = {}
+	gainratios = {}
+
 	for col in cols:
 		if df[col].dtype != 'object' :
 			nonobject[col], gains[col] = c45ContinousHandling(df, col)
 		else :
 			gains[col] = informationGain(globalEntropy(df), attrEntropy(df, col))
+		gainratios[col] = gainratio(df, col, gains[col])
+		print("ini gainratio", gainratios[col])
 	
-	if max(gains, key=gains.get) in nonobject :
-		df.loc[:,max(gains, key=gains.get)] = nonobject[max(gains, key=gains.get)]
+	print(gainratios)
+	print(is_gain_ratio)
+	if is_gain_ratio :
+		maxc45 = max(gainratios, key=gainratios.get)
+	else :
+		maxc45 = max(gains, key=gains.get)
+	
+	if maxc45 in nonobject :
+		df.loc[:,maxc45] = nonobject[maxc45]
 
-	return max(gains, key=gains.get)
+	return maxc45
 
 def c45ContinousHandling(df, column_name):
     values = sorted(df[column_name].unique())
@@ -127,7 +150,7 @@ def c45ContinousHandling(df, column_name):
     
     return temp, winner_gain
 
-def c45(df, targetAttr, attrs, tree = None):
+def c45(df, targetAttr, attrs, is_gain_ratio, tree = None):
 
 	if tree is None:
 		tree = {}
@@ -139,7 +162,7 @@ def c45(df, targetAttr, attrs, tree = None):
 		tree = {'No'}
 		return tree
 
-	attr = bestAttrc45(df, attrs)
+	attr = bestAttrc45(df, attrs, is_gain_ratio)
 	attrs.remove(attr)
 	tree[attr] = {}
 	
@@ -159,4 +182,4 @@ def c45(df, targetAttr, attrs, tree = None):
 #print(check_all_attr(play_tennis.loc[play_tennis['outlook'] == 'Overcast'].iloc[:,-1], 'no'))
 
 #print(id3(play_tennis, 'play', list(['outlook', 'temp', 'humidity', 'wind'])))
-print(c45(play_tennis, 'play', list(['outlook', 'temp', 'humidity', 'wind'])))
+print(c45(play_tennis, 'play', list(['outlook', 'temp', 'humidity', 'wind']), False))
