@@ -122,7 +122,7 @@ def bestAttrc45(df, is_gain_ratio):
 			df = missingValueHandling(df, col)
 
 		if df[col].dtype != 'object' :
-				nonobject[col], gains[col] = c45ContinousHandling(df, col)
+				df[col], gains[col] = c45ContinousHandling(df, col)
 		else :
 			gains[col] = informationGain(globalEntropy(df), attrEntropy(df, col))
 		#print(gains[col])
@@ -133,8 +133,8 @@ def bestAttrc45(df, is_gain_ratio):
 	else :
 		maxc45 = max(gains, key=gains.get)
 	
-	if maxc45 in nonobject :
-		df.loc[:,maxc45] = nonobject[maxc45]
+	#if maxc45 in nonobject :
+		#df.loc[:,maxc45] = nonobject[maxc45]
 		
 	return maxc45
 
